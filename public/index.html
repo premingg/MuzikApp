@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Premingg Music App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="../style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="background-blur"></div>
+  <div class="container">
+    <h1 class="header-title">Premingg Music App</h1>
+
+    <div class="upload-section">
+      <h2 class="section-title">Upload Song</h2>
+      <input type="file" id="uploadInput" accept=".mp3">
+      <div id="uploadStatus"></div>
+      <button id="uploadBtn" class="btn">Upload</button>
+    </div>
+
+    <div class="songs-section">
+      <h2 class="section-title">All Songs</h2>
+      <ul id="songsUl"></ul>
+    </div>
+
+    <div class="playlists-section">
+      <h2 class="section-title">Playlists</h2>
+      <input type="text" id="playlistNameInput" placeholder="New playlist name" />
+      <button id="createPlaylistBtn" class="btn">Create Playlist</button>
+      <ul id="playlistsUl"></ul>
+      <button id="deletePlaylistBtn" class="btn" style="display:none; margin-top:8px;">Delete Playlist</button>
+    </div>
+
+    <div class="playlist-songs-section">
+      <h2 class="section-title">Songs in Selected Playlist</h2>
+      <div id="playlistControlsDiv" style="display:none; margin-bottom:10px;align-items:center;gap:12px;">
+        <button id="shuffleBtn" class="btn" style="width:120px;">Shuffle: Off</button>
+      </div>
+      <ul id="playlistSongsUl"></ul>
+    </div>
+
+    <div class="player-section">
+      <h2 class="section-title">Now Playing</h2>
+      <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+        <div id="nowPlayingArt" class="now-playing-art"></div>
+        <div style="flex:1 1 120px;">
+          <span id="nowPlayingTitle" class="now-playing-title"></span>
+          <audio id="audioPlayer" controls></audio>
+        </div>
+      </div>
+      <!-- Tip removed as requested -->
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
