@@ -65,7 +65,6 @@ function renderSongs() {
         </div>
       </div>
     `;
-    // Use encodeURIComponent for audio src!
     li.querySelector('.play-btn').onclick = () => playSong(song, false, idx);
     li.querySelector('.rename-btn').onclick = async () => {
       const newName = prompt('Enter new name for the song:', song.name);
@@ -264,7 +263,6 @@ deletePlaylistBtn.onclick = async () => {
 };
 
 function playSong(song, fromPlaylist = false, idxInList = 0) {
-  // Use encodeURIComponent for src!
   audioPlayer.src = `/song/${encodeURIComponent(song.id)}`;
   audioPlayer.play();
   if (nowPlayingTitle) nowPlayingTitle.textContent = song.name;
@@ -318,7 +316,6 @@ uploadBtn.onclick = async () => {
   uploadBtn.disabled = true;
   showStatus('Uploading...', true);
   const formData = new FormData();
-  // Append all files for multi-upload, use "songs" as the field name for the array
   for (let i = 0; i < files.length; i++) {
     formData.append('songs', files[i]);
   }
@@ -341,7 +338,6 @@ window.onload = async () => {
 
 // Keyboard shortcuts
 document.addEventListener('keydown', function(e) {
-  // Ignore if typing in an input or textarea
   if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
   switch (e.code) {
     case 'Space':
