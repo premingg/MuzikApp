@@ -308,16 +308,20 @@ audioPlayer.addEventListener('ended', () => {
   }
 });
 
+// MULTI UPLOAD SUPPORT
 uploadBtn.onclick = async () => {
-  const file = uploadInput.files[0];
-  if (!file) {
-    showStatus('Choose a file first!', false);
+  const files = uploadInput.files;
+  if (!files || files.length === 0) {
+    showStatus('Choose file(s) first!', false);
     return;
   }
   uploadBtn.disabled = true;
   showStatus('Uploading...', true);
   const formData = new FormData();
-  formData.append('song', file);
+  // Append all files for multi-upload, use "songs" as the field name for the array
+  for (let i = 0; i < files.length; i++) {
+    formData.append('songs', files[i]);
+  }
   const res = await fetch('/upload', { method: 'POST', body: formData });
   uploadBtn.disabled = false;
   if (res.ok) {
