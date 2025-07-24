@@ -20,8 +20,9 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Upload endpoint
-app.post('/upload', upload.single('song'), (req, res) => {
+// Multi-upload endpoint: support uploading multiple songs at once
+app.post('/upload', upload.array('songs'), (req, res) => {
+  // req.files will be an array of uploaded files
   res.sendStatus(200);
 });
 
