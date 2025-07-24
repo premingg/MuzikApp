@@ -1,7 +1,8 @@
 # MuzikApp
 
-A simple music player web app built with Node.js and Express.  
+A simple music player web app built with Node.js and Express.
 Upload songs, create playlists, and listen online.
+I have made it mainly for my personal use.
 
 ## Live Demo
 
