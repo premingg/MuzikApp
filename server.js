@@ -13,7 +13,6 @@ if (!fs.existsSync(PLAYLISTS_FILE)) fs.writeFileSync(PLAYLISTS_FILE, JSON.string
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Multer setup: save uploaded file as original filename in songs/
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, SONGS_DIR),
   filename: (req, file, cb) => cb(null, file.originalname)
@@ -22,7 +21,8 @@ const upload = multer({ storage });
 
 // Multi-upload endpoint: support uploading multiple songs at once
 app.post('/upload', upload.array('songs'), (req, res) => {
-  // req.files will be an array of uploaded files
+  // You can log req.files for debugging
+  console.log('Received files:', req.files);
   res.sendStatus(200);
 });
 
