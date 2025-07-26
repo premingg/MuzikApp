@@ -136,7 +136,21 @@ app.post('/delete-song', (req, res) => {
 
   res.sendStatus(200);
 });
+// ... (existing code above)
 
+app.post('/rename-playlist', (req, res) => {
+  const { oldName, newName } = req.body;
+  if (!oldName || !newName) return res.status(400).send('Missing');
+  const playlists = loadPlaylists();
+  if (!playlists[oldName]) return res.status(404).send('Playlist not found');
+  if (playlists[newName]) return res.status(409).send('New name exists');
+  playlists[newName] = playlists[oldName];
+  delete playlists[oldName];
+  savePlaylists(playlists);
+  res.sendStatus(200);
+});
+
+// ... (existing code below)
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Premingg Music App server running at http://localhost:${PORT}/`);

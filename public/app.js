@@ -1,6 +1,7 @@
 const uploadInput = document.getElementById('uploadInput');
 const uploadBtn = document.getElementById('uploadBtn');
 const uploadStatus = document.getElementById('uploadStatus');
+const uploadProgress = document.getElementById('uploadProgress');
 const songsUl = document.getElementById('songsUl');
 const playlistsUl = document.getElementById('playlistsUl');
 const playlistNameInput = document.getElementById('playlistNameInput');
@@ -12,6 +13,10 @@ const nowPlayingTitle = document.getElementById('nowPlayingTitle');
 const nowPlayingArt = document.getElementById('nowPlayingArt');
 const shuffleBtn = document.getElementById('shuffleBtn');
 const playlistControlsDiv = document.getElementById('playlistControlsDiv');
+const songSearchInput = document.getElementById('songSearchInput');
+const nextBtn = document.getElementById('nextBtn');
+const prevBtn = document.getElementById('prevBtn');
+const queueStatus = document.getElementById('queueStatus');
 
 let allSongs = [];
 let playlists = {};
@@ -22,6 +27,9 @@ let shuffleMode = false;
 let allSongsOrder = [];
 let allSongsIndex = -1;
 let playingFromAllSongs = false;
+let songDurationsCache = {};
+let currentQueue = [];
+let queuePointer = -1;
 
 function showStatus(message, isSuccess = true) {
   uploadStatus.textContent = message;
@@ -37,6 +45,7 @@ async function loadSongs() {
   allSongs = await res.json();
   renderSongs();
 }
+
 async function loadPlaylists() {
   const res = await fetch('/playlists');
   playlists = await res.json();
@@ -45,27 +54,46 @@ async function loadPlaylists() {
   renderPlaylistControls();
 }
 
+songSearchInput.addEventListener("input", () => renderSongs());
+
+function formatDuration(seconds) {
+  if (typeof seconds !== "number" || isNaN(seconds)) return "--:--";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// --- Songs Rendering ---
 function renderSongs() {
   songsUl.innerHTML = '';
-  allSongsOrder = allSongs.map(song => song.id);
-  allSongs.forEach((song, idx) => {
+  const filter = songSearchInput.value.trim().toLowerCase();
+  let filteredSongs = allSongs;
+  if (filter) {
+    filteredSongs = allSongs.filter(song => song.name.toLowerCase().includes(filter));
+  }
+  allSongsOrder = filteredSongs.map(song => song.id);
+
+  filteredSongs.forEach((song, idx) => {
     const li = document.createElement('li');
     li.className = "song-card";
+    const durationStr = formatDuration(songDurationsCache[song.id] || song.duration);
+
     li.innerHTML = `
       <div class="card-main">
         <div class="song-album-art"></div>
         <div>
           <span class="song-title">${song.name}</span>
+          <span class="song-duration" style="color:#6c3ca2;font-size:0.95em;margin-left:10px;">${durationStr}</span>
           <div class="song-actions">
-            <button class="icon-btn play-btn" title="Play">&#9654;</button>
-            <button class="icon-btn rename-btn" title="Rename">&#9998;</button>
-            <button class="icon-btn delete-btn" title="Delete">&#128465;</button>
+            <button class="icon-btn play-btn" title="Play this song">&#9654;</button>
+            <button class="icon-btn rename-btn" title="Rename this song">&#9998;</button>
+            <button class="icon-btn delete-btn" title="Delete this song">&#128465;</button>
             ${selectedPlaylist ? '<button class="icon-btn add-btn" title="Add to Playlist">&#43;</button>' : ''}
           </div>
         </div>
       </div>
     `;
-    li.querySelector('.play-btn').onclick = () => playSong(song, false, idx);
+    li.querySelector('.play-btn').onclick = () => setQueue(filteredSongs, idx);
     li.querySelector('.rename-btn').onclick = async () => {
       const newName = prompt('Enter new name for the song:', song.name);
       if (newName && newName.trim() && newName !== song.name) {
@@ -97,6 +125,7 @@ function renderSongs() {
         showStatus('Could not delete song.', false);
       }
     };
+    // --- FIX: Add to Playlist button ---
     if (selectedPlaylist && li.querySelector('.add-btn')) {
       li.querySelector('.add-btn').onclick = async () => {
         const res = await fetch('/add-to-playlist', {
@@ -105,7 +134,7 @@ function renderSongs() {
           body: JSON.stringify({ playlist: selectedPlaylist, songId: song.id })
         });
         if (res.ok) {
-          await loadPlaylists();
+          await loadPlaylists(); // reload to update playlist songs
           showStatus('Added to playlist!', true);
         } else {
           showStatus('Could not add.', false);
@@ -116,6 +145,7 @@ function renderSongs() {
   });
 }
 
+// --- Playlists Rendering ---
 function renderPlaylists() {
   playlistsUl.innerHTML = '';
   Object.keys(playlists).forEach(name => {
@@ -123,7 +153,8 @@ function renderPlaylists() {
     li.className = selectedPlaylist === name ? 'playlist-card selected-playlist' : 'playlist-card';
     li.innerHTML = `
       <span class="playlist-name">${name}</span>
-      <button class="icon-btn select-btn">${selectedPlaylist === name ? '✓' : '→'}</button>
+      <button class="icon-btn select-btn" title="Select this playlist">${selectedPlaylist === name ? '✓' : '→'}</button>
+      <button class="icon-btn playlist-rename-btn" title="Rename playlist">&#9998;</button>
     `;
     li.querySelector('.select-btn').onclick = () => {
       selectedPlaylist = name;
@@ -133,6 +164,28 @@ function renderPlaylists() {
       renderPlaylistSongs();
       renderPlaylistControls();
       deletePlaylistBtn.style.display = "inline-block";
+    };
+    // --- FIX: Playlist rename functionality ---
+    li.querySelector('.playlist-rename-btn').onclick = async () => {
+      const newName = prompt('Enter new name for the playlist:', name);
+      if (newName && newName.trim() && newName !== name) {
+        const res = await fetch('/rename-playlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ oldName: name, newName: newName.trim() })
+        });
+        if (res.ok) {
+          // Update selectedPlaylist to the new name
+          selectedPlaylist = newName.trim();
+          await loadPlaylists(); // refresh playlists from backend
+          renderPlaylists();
+          renderSongs();
+          renderPlaylistSongs();
+          showStatus('Playlist renamed!', true);
+        } else {
+          showStatus('Failed to rename playlist.', false);
+        }
+      }
     };
     playlistsUl.appendChild(li);
   });
@@ -153,6 +206,7 @@ function renderPlaylistSongs() {
   songIds.forEach((id, idx) => {
     const song = allSongs.find(s => s.id === id);
     if (!song) return;
+    const durationStr = formatDuration(songDurationsCache[song.id] || song.duration);
     const li = document.createElement('li');
     li.className = "song-card";
     li.innerHTML = `
@@ -160,14 +214,15 @@ function renderPlaylistSongs() {
         <div class="song-album-art"></div>
         <div>
           <span class="song-title">${song.name}</span>
+          <span class="song-duration" style="color:#6c3ca2;font-size:0.95em;margin-left:10px;">${durationStr}</span>
           <div class="song-actions">
-            <button class="icon-btn play-btn" title="Play">&#9654;</button>
-            <button class="icon-btn remove-btn" title="Remove from Playlist">&#8722;</button>
+            <button class="icon-btn play-btn" title="Play this song">&#9654;</button>
+            <button class="icon-btn remove-btn" title="Remove from playlist">&#8722;</button>
           </div>
         </div>
       </div>
     `;
-    li.querySelector('.play-btn').onclick = () => playSong(song, true, idx);
+    li.querySelector('.play-btn').onclick = () => setQueue(songIds.map(id => allSongs.find(s => s.id === id)), idx, selectedPlaylist);
     li.querySelector('.remove-btn').onclick = async () => {
       const res = await fetch('/remove-from-playlist', {
         method: 'POST',
@@ -213,7 +268,6 @@ function resetPlaylistOrder() {
   playlistIndex = -1;
 }
 
-// Fisher-Yates shuffle
 function shuffleArray(arr) {
   let a = arr.slice();
   for (let i = a.length - 1; i > 0; i--) {
@@ -262,51 +316,59 @@ deletePlaylistBtn.onclick = async () => {
   }
 };
 
-function playSong(song, fromPlaylist = false, idxInList = 0) {
+// --- QUEUE LOGIC ---
+function setQueue(songArr, startIdx = 0, queueName = "") {
+  currentQueue = songArr;
+  queuePointer = startIdx;
+  playQueueSong(queueName);
+}
+
+function playQueueSong(queueName = "") {
+  if (!currentQueue.length || queuePointer < 0 || queuePointer >= currentQueue.length) {
+    audioPlayer.src = "";
+    nowPlayingTitle.textContent = "No song playing";
+    queueStatus.textContent = "";
+    return;
+  }
+  const song = currentQueue[queuePointer];
   audioPlayer.src = `/song/${encodeURIComponent(song.id)}`;
   audioPlayer.play();
-  if (nowPlayingTitle) nowPlayingTitle.textContent = song.name;
-  if (nowPlayingArt) {
-    nowPlayingArt.style.backgroundImage = 'url("https://img.icons8.com/color/96/000000/musical-notes.png")';
-    nowPlayingArt.style.display = "inline-block";
-  }
-  if (fromPlaylist) {
-    playingFromAllSongs = false;
-    playlistIndex = shuffleMode
-      ? playlistOrder.findIndex(id => id === song.id)
-      : idxInList;
-  } else {
-    playingFromAllSongs = true;
-    allSongsIndex = idxInList;
+  nowPlayingTitle.textContent = song.name;
+  nowPlayingArt.style.backgroundImage = 'url("https://img.icons8.com/color/96/000000/musical-notes.png")';
+  nowPlayingArt.style.display = "inline-block";
+  queueStatus.textContent = queueName
+    ? `Playlist: ${queueName} (#${queuePointer + 1} of ${currentQueue.length})`
+    : `Queue: Song #${queuePointer + 1} of ${currentQueue.length}`;
+  if (!songDurationsCache[song.id]) {
+    audioPlayer.onloadedmetadata = function() {
+      songDurationsCache[song.id] = audioPlayer.duration;
+      renderSongs();
+      renderPlaylistSongs();
+    };
   }
 }
 
-// Autoplay next song in playlist or all songs when audio ends
-audioPlayer.addEventListener('ended', () => {
-  if (selectedPlaylist && playlistOrder.length > 0 && playlistIndex !== -1 && !playingFromAllSongs) {
-    const nextIdx = playlistIndex + 1;
-    if (nextIdx < playlistOrder.length) {
-      const nextSongId = playlistOrder[nextIdx];
-      const nextSong = allSongs.find(s => s.id === nextSongId);
-      if (nextSong) {
-        playSong(nextSong, true, nextIdx);
-      }
-    }
-    return;
+nextBtn.onclick = () => {
+  if (queuePointer < currentQueue.length - 1) {
+    queuePointer++;
+    playQueueSong(selectedPlaylist);
   }
-  if (playingFromAllSongs && allSongsOrder.length > 0 && allSongsIndex !== -1) {
-    const nextIdx = allSongsIndex + 1;
-    if (nextIdx < allSongsOrder.length) {
-      const nextSongId = allSongsOrder[nextIdx];
-      const nextSong = allSongs.find(s => s.id === nextSongId);
-      if (nextSong) {
-        playSong(nextSong, false, nextIdx);
-      }
-    }
+};
+prevBtn.onclick = () => {
+  if (queuePointer > 0) {
+    queuePointer--;
+    playQueueSong(selectedPlaylist);
+  }
+};
+
+audioPlayer.addEventListener('ended', () => {
+  if (queuePointer < currentQueue.length - 1) {
+    queuePointer++;
+    playQueueSong(selectedPlaylist);
   }
 });
 
-// MULTI UPLOAD SUPPORT
+// MULTI UPLOAD SUPPORT with PROGRESS BAR
 uploadBtn.onclick = async () => {
   const files = uploadInput.files;
   if (!files || files.length === 0) {
@@ -315,19 +377,48 @@ uploadBtn.onclick = async () => {
   }
   uploadBtn.disabled = true;
   showStatus('Uploading...', true);
+
+  if (uploadProgress) {
+    uploadProgress.style.display = 'block';
+    uploadProgress.value = 0;
+  }
+
   const formData = new FormData();
   for (let i = 0; i < files.length; i++) {
     formData.append('songs', files[i]);
   }
-  const res = await fetch('/upload', { method: 'POST', body: formData });
-  uploadBtn.disabled = false;
-  if (res.ok) {
-    await loadSongs();
-    showStatus('Upload successful!', true);
-    uploadInput.value = '';
-  } else {
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/upload', true);
+
+  xhr.upload.onprogress = function (e) {
+    if (e.lengthComputable && uploadProgress) {
+      const percent = Math.round((e.loaded / e.total) * 100);
+      uploadProgress.value = percent;
+      uploadStatus.textContent = `Uploading... ${percent}%`;
+      uploadStatus.className = "success";
+    }
+  };
+
+  xhr.onload = async function () {
+    uploadBtn.disabled = false;
+    if (uploadProgress) uploadProgress.style.display = 'none';
+    if (xhr.status === 200) {
+      await loadSongs();
+      showStatus('Upload successful!', true);
+      uploadInput.value = '';
+    } else {
+      showStatus('Upload failed.', false);
+    }
+  };
+
+  xhr.onerror = function () {
+    uploadBtn.disabled = false;
+    if (uploadProgress) uploadProgress.style.display = 'none';
     showStatus('Upload failed.', false);
-  }
+  };
+
+  xhr.send(formData);
 };
 
 window.onload = async () => {
@@ -349,38 +440,16 @@ document.addEventListener('keydown', function(e) {
       break;
     case 'ArrowRight':
       e.preventDefault();
-      if (selectedPlaylist && playlistOrder.length > 0 && playlistIndex !== -1 && !playingFromAllSongs) {
-        const nextIdx = playlistIndex + 1;
-        if (nextIdx < playlistOrder.length) {
-          const nextSongId = playlistOrder[nextIdx];
-          const nextSong = allSongs.find(s => s.id === nextSongId);
-          if (nextSong) playSong(nextSong, true, nextIdx);
-        }
-      } else if (playingFromAllSongs && allSongsOrder.length > 0 && allSongsIndex !== -1) {
-        const nextIdx = allSongsIndex + 1;
-        if (nextIdx < allSongsOrder.length) {
-          const nextSongId = allSongsOrder[nextIdx];
-          const nextSong = allSongs.find(s => s.id === nextSongId);
-          if (nextSong) playSong(nextSong, false, nextIdx);
-        }
+      if (queuePointer < currentQueue.length - 1) {
+        queuePointer++;
+        playQueueSong(selectedPlaylist);
       }
       break;
     case 'ArrowLeft':
       e.preventDefault();
-      if (selectedPlaylist && playlistOrder.length > 0 && playlistIndex > 0 && !playingFromAllSongs) {
-        const prevIdx = playlistIndex - 1;
-        if (prevIdx >= 0) {
-          const prevSongId = playlistOrder[prevIdx];
-          const prevSong = allSongs.find(s => s.id === prevSongId);
-          if (prevSong) playSong(prevSong, true, prevIdx);
-        }
-      } else if (playingFromAllSongs && allSongsOrder.length > 0 && allSongsIndex > 0) {
-        const prevIdx = allSongsIndex - 1;
-        if (prevIdx >= 0) {
-          const prevSongId = allSongsOrder[prevIdx];
-          const prevSong = allSongs.find(s => s.id === prevSongId);
-          if (prevSong) playSong(prevSong, false, prevIdx);
-        }
+      if (queuePointer > 0) {
+        queuePointer--;
+        playQueueSong(selectedPlaylist);
       }
       break;
   }

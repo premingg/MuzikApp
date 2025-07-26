@@ -16,26 +16,28 @@
       <h2 class="section-title">Upload Songs</h2>
       <input type="file" id="uploadInput" accept=".mp3" multiple>
       <div id="uploadStatus"></div>
-      <button id="uploadBtn" class="btn">Upload</button>
+      <progress id="uploadProgress" value="0" max="100" style="width: 100%; display: none;"></progress>
+      <button id="uploadBtn" class="btn" title="Upload selected songs">Upload</button>
     </div>
 
     <div class="songs-section">
       <h2 class="section-title">All Songs</h2>
+      <input type="search" id="songSearchInput" placeholder="Search songs..." autocomplete="off" style="margin-bottom:14px;">
       <ul id="songsUl"></ul>
     </div>
 
     <div class="playlists-section">
       <h2 class="section-title">Playlists</h2>
       <input type="text" id="playlistNameInput" placeholder="New playlist name" />
-      <button id="createPlaylistBtn" class="btn">Create Playlist</button>
+      <button id="createPlaylistBtn" class="btn" title="Create new playlist">Create Playlist</button>
       <ul id="playlistsUl"></ul>
-      <button id="deletePlaylistBtn" class="btn" style="display:none; margin-top:8px;">Delete Playlist</button>
+      <button id="deletePlaylistBtn" class="btn" style="display:none; margin-top:8px;" title="Delete selected playlist">Delete Playlist</button>
     </div>
 
     <div class="playlist-songs-section">
       <h2 class="section-title">Songs in Selected Playlist</h2>
       <div id="playlistControlsDiv" style="display:none; margin-bottom:10px;align-items:center;gap:12px;">
-        <button id="shuffleBtn" class="btn" style="width:120px;">Shuffle: Off</button>
+        <button id="shuffleBtn" class="btn" style="width:120px;" title="Shuffle songs in playlist">Shuffle: Off</button>
       </div>
       <ul id="playlistSongsUl"></ul>
     </div>
@@ -47,6 +49,11 @@
         <div style="flex:1 1 120px;">
           <span id="nowPlayingTitle" class="now-playing-title"></span>
           <audio id="audioPlayer" controls></audio>
+          <div id="playerControlsRow" style="margin-top:8px;">
+            <button id="prevBtn" class="icon-btn" title="Play previous song">&#9664;</button>
+            <button id="nextBtn" class="icon-btn" title="Play next song">&#9654;</button>
+            <span id="queueStatus" style="margin-left:18px;font-size:0.98em;color:#6c3ca2;"></span>
+          </div>
         </div>
       </div>
     </div>
