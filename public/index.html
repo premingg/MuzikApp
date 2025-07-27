@@ -1,63 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Premingg Music App</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="../style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAW BEATS - Street Music Player</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="background-blur"></div>
-  <div class="container">
-    <h1 class="header-title">Premingg Music App</h1>
+    <!-- Status Message -->
+    <div id="statusMessage" class="status-message"></div>
 
-    <div class="upload-section">
-      <h2 class="section-title">Upload Songs</h2>
-      <input type="file" id="uploadInput" accept=".mp3" multiple>
-      <div id="uploadStatus"></div>
-      <progress id="uploadProgress" value="0" max="100" style="width: 100%; display: none;"></progress>
-      <button id="uploadBtn" class="btn" title="Upload selected songs">Upload</button>
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="logo">
+                <i class="fas fa-microphone-alt"></i>
+                <h1>RAW BEATS</h1>
+                <p>UNDERGROUND MUSIC FOR THE STREETS</p>
+            </div>
+            
+            <div class="nav-menu">
+                <button class="nav-btn active" data-page="home">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </button>
+                <button class="nav-btn" data-page="playlists">
+                    <i class="fas fa-fire"></i>
+                    <span>Collections</span>
+                </button>
+                <button class="nav-btn" data-page="upload">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload</span>
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="globalSearch" placeholder="Search your street vibes..." autocomplete="off">
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-outline" id="shuffleAllBtn">
+                        <i class="fas fa-random"></i> SHUFFLE ALL
+                    </button>
+                    <div class="volume-control">
+                        <button id="muteBtn" class="volume-btn">
+                            <i class="fas fa-volume-up"></i>
+                        </button>
+                        <input type="range" id="volumeSlider" min="0" max="100" value="70" class="volume-slider">
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="content-area">
+                <!-- Home Page -->
+                <div id="homePage" class="page active">
+                    <div class="page-header">
+                        <h2><i class="fas fa-fire"></i> Your Street Collection</h2>
+                        <p>All your fire tracks in one place</p>
+                    </div>
+                    <div id="songsContainer" class="songs-grid"></div>
+                </div>
+
+                <!-- Playlists Page -->
+                <div id="playlistsPage" class="page">
+                    <div class="page-header">
+                        <h2><i class="fas fa-fire"></i> Your Collections</h2>
+                        <p>Curated street playlists</p>
+                    </div>
+                    
+                    <!-- Create Playlist Section -->
+                    <div class="create-playlist-section">
+                        <input type="text" id="newPlaylistName" placeholder="New collection name..." class="playlist-input">
+                        <button id="createPlaylistBtn" class="btn btn-neon">
+                            <i class="fas fa-plus"></i> CREATE COLLECTION
+                        </button>
+                    </div>
+                    
+                    <div id="playlistsGrid" class="playlists-grid"></div>
+                </div>
+
+                <!-- Upload Page -->
+                <div id="uploadPage" class="page">
+                    <div class="page-header">
+                        <h2><i class="fas fa-upload"></i> Upload Your Beats</h2>
+                        <p>Add new fire tracks to your collection</p>
+                    </div>
+                    
+                    <div class="upload-section">
+                        <div id="uploadArea" class="upload-area">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <h3>Drop your beats here</h3>
+                            <p>or click to browse files</p>
+                            <button class="btn btn-neon">
+                                <i class="fas fa-folder-open"></i> BROWSE FILES
+                            </button>
+                        </div>
+                        
+                        <input type="file" id="fileInput" multiple accept="audio/*" style="display: none;">
+                        
+                        <!-- Upload Progress -->
+                        <div id="uploadProgress" class="upload-progress" style="display: none;">
+                            <div class="progress-info">
+                                <span id="progressText">Uploading...</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div id="progressFillUpload" class="progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <div class="songs-section">
-      <h2 class="section-title">All Songs</h2>
-      <input type="search" id="songSearchInput" placeholder="Search songs..." autocomplete="off" style="margin-bottom:14px;">
-      <ul id="songsUl"></ul>
-    </div>
-
-    <div class="playlists-section">
-      <h2 class="section-title">Playlists</h2>
-      <input type="text" id="playlistNameInput" placeholder="New playlist name" />
-      <button id="createPlaylistBtn" class="btn" title="Create new playlist">Create Playlist</button>
-      <ul id="playlistsUl"></ul>
-      <button id="deletePlaylistBtn" class="btn" style="display:none; margin-top:8px;" title="Delete selected playlist">Delete Playlist</button>
-    </div>
-
-    <div class="playlist-songs-section">
-      <h2 class="section-title">Songs in Selected Playlist</h2>
-      <div id="playlistControlsDiv" style="display:none; margin-bottom:10px;align-items:center;gap:12px;">
-        <button id="shuffleBtn" class="btn" style="width:120px;" title="Shuffle songs in playlist">Shuffle: Off</button>
-      </div>
-      <ul id="playlistSongsUl"></ul>
-    </div>
-
-    <div class="player-section">
-      <h2 class="section-title">Now Playing</h2>
-      <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
-        <div id="nowPlayingArt" class="now-playing-art"></div>
-        <div style="flex:1 1 120px;">
-          <span id="nowPlayingTitle" class="now-playing-title"></span>
-          <audio id="audioPlayer" controls></audio>
-          <div id="playerControlsRow" style="margin-top:8px;">
-            <button id="prevBtn" class="icon-btn" title="Play previous song">&#9664;</button>
-            <button id="nextBtn" class="icon-btn" title="Play next song">&#9654;</button>
-            <span id="queueStatus" style="margin-left:18px;font-size:0.98em;color:#6c3ca2;"></span>
-          </div>
+    <!-- Music Player Bar -->
+    <div class="player-bar">
+        <!-- Current Song Info -->
+        <div class="player-song-info">
+            <div id="currentSongArt" class="current-song-art">
+                <i class="fas fa-microphone-alt"></i>
+            </div>
+            <div class="current-song-details">
+                <div id="currentSongTitle" class="current-song-title">Select a track</div>
+                <div id="currentSongArtist" class="current-song-artist">Street Artist 🎤</div>
+            </div>
         </div>
-      </div>
+
+        <!-- Player Controls -->
+        <div class="player-controls">
+            <div class="control-buttons">
+                <button id="shuffleBtn" class="control-btn" title="Shuffle">
+                    <i class="fas fa-random"></i>
+                </button>
+                <button id="prevBtn" class="control-btn" title="Previous">
+                    <i class="fas fa-step-backward"></i>
+                </button>
+                <button id="playPauseBtn" class="play-btn" title="Play/Pause">
+                    <i class="fas fa-play"></i>
+                </button>
+                <button id="nextBtn" class="control-btn" title="Next">
+                    <i class="fas fa-step-forward"></i>
+                </button>
+                <button id="repeatBtn" class="control-btn" title="Repeat">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="progress-section">
+                <span id="currentTime" class="time">0:00</span>
+                <div id="progressBar" class="progress-bar">
+                    <div id="progressFill" class="progress-fill"></div>
+                    <div id="progressHandle" class="progress-handle"></div>
+                </div>
+                <span id="totalTime" class="time">0:00</span>
+            </div>
+        </div>
+
+        <!-- Volume Control -->
+        <div class="player-volume">
+            <button id="muteBtn" class="volume-btn">
+                <i class="fas fa-volume-up"></i>
+            </button>
+            <input type="range" id="volumeSlider" min="0" max="100" value="70" class="volume-slider">
+        </div>
     </div>
-  </div>
-  <script src="app.js"></script>
+
+    <!-- Playlist Modal -->
+    <div id="playlistModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="playlistModalTitle">Playlist</h3>
+                <div class="modal-actions">
+                    <button id="shufflePlaylistBtn" class="btn btn-outline" title="Shuffle Collection">
+                        <i class="fas fa-random"></i>
+                    </button>
+                    <button id="renamePlaylistBtn" class="btn btn-outline" title="Rename Collection">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button id="deletePlaylistBtn" class="btn btn-danger" title="Delete Collection">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                    <button class="modal-close" onclick="app.closePlaylistModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div id="playlistSongs" class="playlist-songs"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audio Element -->
+    <audio id="audioPlayer" preload="metadata"></audio>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
 </body>
 </html>

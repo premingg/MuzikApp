@@ -1,157 +1,236 @@
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
-const SONGS_DIR = path.join(__dirname, 'songs');
-const PLAYLISTS_FILE = path.join(__dirname, 'playlists.json');
+const PORT = 3000;
 
-if (!fs.existsSync(SONGS_DIR)) fs.mkdirSync(SONGS_DIR);
-if (!fs.existsSync(PLAYLISTS_FILE)) fs.writeFileSync(PLAYLISTS_FILE, JSON.stringify({}));
-
+// Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static('public'));
 
+// Ensure directories exist
+const songsDir = path.join(__dirname, 'songs');
+const playlistsFile = path.join(__dirname, 'playlists.json');
+
+if (!fs.existsSync(songsDir)) {
+    fs.mkdirSync(songsDir);
+}
+
+if (!fs.existsSync(playlistsFile)) {
+    fs.writeFileSync(playlistsFile, JSON.stringify({}));
+}
+
+// Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, SONGS_DIR),
-  filename: (req, file, cb) => cb(null, file.originalname)
-});
-const upload = multer({ storage });
-
-// Multi-upload endpoint: support uploading multiple songs at once
-app.post('/upload', upload.array('songs'), (req, res) => {
-  // You can log req.files for debugging
-  console.log('Received files:', req.files);
-  res.sendStatus(200);
+    destination: function (req, file, cb) {
+        cb(null, songsDir);
+    },
+    filename: function (req, file, cb) {
+        cb(null, file.originalname);
+    }
 });
 
-// Serve song files (decode URI for filenames with spaces/special chars)
-app.get('/song/:id', (req, res) => {
-  const decodedId = decodeURIComponent(req.params.id);
-  const songPath = path.join(SONGS_DIR, decodedId);
-  if (fs.existsSync(songPath)) {
-    res.sendFile(songPath);
-  } else {
-    res.status(404).send('Song not found');
-  }
+const upload = multer({ storage: storage });
+
+// Helper functions
+function getPlaylists() {
+    try {
+        const data = fs.readFileSync(playlistsFile, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        return {};
+    }
+}
+
+function savePlaylists(playlists) {
+    fs.writeFileSync(playlistsFile, JSON.stringify(playlists, null, 2));
+}
+
+// Routes
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// List all songs (id = filename)
 app.get('/songs', (req, res) => {
-  const files = fs.readdirSync(SONGS_DIR).filter(f => f.endsWith('.mp3'));
-  res.json(files.map(filename => ({
-    id: filename,
-    name: filename.replace(/\.mp3$/i, '')
-  })));
+    try {
+        const files = fs.readdirSync(songsDir);
+        const songs = files
+            .filter(file => ['.mp3', '.wav', '.m4a', '.ogg'].includes(path.extname(file).toLowerCase()))
+            .map(file => ({
+                id: file,
+                name: path.parse(file).name
+            }));
+        res.json(songs);
+    } catch (err) {
+        console.error('Error reading songs:', err);
+        res.status(500).json({ error: 'Failed to read songs' });
+    }
 });
 
-// --- PLAYLIST ENDPOINTS ---
-
-function loadPlaylists() {
-  return JSON.parse(fs.readFileSync(PLAYLISTS_FILE, 'utf8'));
-}
-function savePlaylists(obj) {
-  fs.writeFileSync(PLAYLISTS_FILE, JSON.stringify(obj, null, 2));
-}
+app.get('/song/:id', (req, res) => {
+    const songId = req.params.id;
+    const songPath = path.join(songsDir, songId);
+    
+    if (!fs.existsSync(songPath)) {
+        return res.status(404).json({ error: 'Song not found' });
+    }
+    
+    res.sendFile(songPath);
+});
 
 app.get('/playlists', (req, res) => {
-  res.json(loadPlaylists());
+    res.json(getPlaylists());
+});
+
+app.post('/upload', upload.array('songs'), (req, res) => {
+    try {
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: 'No files uploaded' });
+        }
+        res.json({ message: 'Upload successful', files: req.files.length });
+    } catch (err) {
+        console.error('Upload error:', err);
+        res.status(500).json({ error: 'Upload failed' });
+    }
 });
 
 app.post('/playlist', (req, res) => {
-  const name = req.body.name?.trim();
-  if (!name) return res.status(400).send('No name');
-  const playlists = loadPlaylists();
-  if (playlists[name]) return res.status(409).send('Exists');
-  playlists[name] = [];
-  savePlaylists(playlists);
-  res.sendStatus(200);
-});
-
-app.post('/delete-playlist', (req, res) => {
-  const { playlist } = req.body;
-  const playlists = loadPlaylists();
-  if (!playlists[playlist]) return res.status(404).send('Not found');
-  delete playlists[playlist];
-  savePlaylists(playlists);
-  res.sendStatus(200);
+    const { name } = req.body;
+    if (!name) {
+        return res.status(400).json({ error: 'Playlist name required' });
+    }
+    
+    const playlists = getPlaylists();
+    if (playlists[name]) {
+        return res.status(400).json({ error: 'Playlist already exists' });
+    }
+    
+    playlists[name] = [];
+    savePlaylists(playlists);
+    res.json({ message: 'Playlist created' });
 });
 
 app.post('/add-to-playlist', (req, res) => {
-  const { playlist, songId } = req.body;
-  const playlists = loadPlaylists();
-  if (!playlists[playlist]) return res.status(404).send('Playlist not found');
-  if (!fs.existsSync(path.join(SONGS_DIR, songId))) return res.status(404).send('Song not found');
-  if (!playlists[playlist].includes(songId)) playlists[playlist].push(songId);
-  savePlaylists(playlists);
-  res.sendStatus(200);
+    const { playlist, songId } = req.body;
+    const playlists = getPlaylists();
+    
+    if (!playlists[playlist]) {
+        return res.status(404).json({ error: 'Playlist not found' });
+    }
+    
+    if (!playlists[playlist].includes(songId)) {
+        playlists[playlist].push(songId);
+        savePlaylists(playlists);
+    }
+    
+    res.json({ message: 'Song added to playlist' });
 });
 
 app.post('/remove-from-playlist', (req, res) => {
-  const { playlist, songId } = req.body;
-  const playlists = loadPlaylists();
-  if (!playlists[playlist]) return res.status(404).send('Playlist not found');
-  playlists[playlist] = playlists[playlist].filter(id => id !== songId);
-  savePlaylists(playlists);
-  res.sendStatus(200);
+    const { playlist, songId } = req.body;
+    const playlists = getPlaylists();
+    
+    if (!playlists[playlist]) {
+        return res.status(404).json({ error: 'Playlist not found' });
+    }
+    
+    playlists[playlist] = playlists[playlist].filter(id => id !== songId);
+    savePlaylists(playlists);
+    res.json({ message: 'Song removed from playlist' });
 });
 
+app.post('/delete-playlist', (req, res) => {
+    const { playlist } = req.body;
+    const playlists = getPlaylists();
+    
+    if (!playlists[playlist]) {
+        return res.status(404).json({ error: 'Playlist not found' });
+    }
+    
+    delete playlists[playlist];
+    savePlaylists(playlists);
+    res.json({ message: 'Playlist deleted' });
+});
+
+app.post('/rename-playlist', (req, res) => {
+    const { oldName, newName } = req.body;
+    const playlists = getPlaylists();
+    
+    if (!playlists[oldName]) {
+        return res.status(404).json({ error: 'Playlist not found' });
+    }
+    
+    if (playlists[newName]) {
+        return res.status(400).json({ error: 'New playlist name already exists' });
+    }
+    
+    playlists[newName] = playlists[oldName];
+    delete playlists[oldName];
+    savePlaylists(playlists);
+    res.json({ message: 'Playlist renamed' });
+});
+
+// Replace the rename-song and delete-song endpoints with these fixed versions
+
 app.post('/rename-song', (req, res) => {
-  const { id, newName } = req.body;
-  if (!id || !newName) return res.status(400).send('Missing');
-  const decodedId = decodeURIComponent(id);
-  const oldPath = path.join(SONGS_DIR, decodedId);
-  const ext = path.extname(decodedId) || '.mp3';
-  const sanitizedNewName = newName.replace(/[\\/]/g, '_');
-  const newFileName = sanitizedNewName.endsWith(ext) ? sanitizedNewName : sanitizedNewName + ext;
-  const newPath = path.join(SONGS_DIR, newFileName);
-  if (!fs.existsSync(oldPath)) return res.status(404).send('Song not found');
-  if (fs.existsSync(newPath)) return res.status(409).send('File exists');
-  fs.renameSync(oldPath, newPath);
-
-  // Update playlists
-  const playlists = loadPlaylists();
-  Object.keys(playlists).forEach(pl => {
-    playlists[pl] = playlists[pl].map(sid => (sid === decodedId ? newFileName : sid));
-  });
-  savePlaylists(playlists);
-
-  res.sendStatus(200);
+    const { songId, newName } = req.body; // Changed from 'id' to 'songId'
+    const oldPath = path.join(songsDir, songId);
+    const ext = path.extname(songId);
+    const newPath = path.join(songsDir, newName + ext);
+    
+    if (!fs.existsSync(oldPath)) {
+        return res.status(404).json({ error: 'Song not found' });
+    }
+    
+    try {
+        fs.renameSync(oldPath, newPath);
+        
+        // Update playlists
+        const playlists = getPlaylists();
+        const newId = newName + ext;
+        
+        Object.keys(playlists).forEach(playlistName => {
+            const index = playlists[playlistName].indexOf(songId);
+            if (index !== -1) {
+                playlists[playlistName][index] = newId;
+            }
+        });
+        
+        savePlaylists(playlists);
+        res.json({ message: 'Song renamed' });
+    } catch (err) {
+        console.error('Rename error:', err);
+        res.status(500).json({ error: 'Failed to rename song' });
+    }
 });
 
 app.post('/delete-song', (req, res) => {
-  const { id } = req.body;
-  const decodedId = decodeURIComponent(id);
-  const songPath = path.join(SONGS_DIR, decodedId);
-  if (!fs.existsSync(songPath)) return res.status(404).send('Song not found');
-  fs.unlinkSync(songPath);
-
-  // Remove from playlists
-  const playlists = loadPlaylists();
-  Object.keys(playlists).forEach(pl => {
-    playlists[pl] = playlists[pl].filter(sid => sid !== decodedId);
-  });
-  savePlaylists(playlists);
-
-  res.sendStatus(200);
-});
-// ... (existing code above)
-
-app.post('/rename-playlist', (req, res) => {
-  const { oldName, newName } = req.body;
-  if (!oldName || !newName) return res.status(400).send('Missing');
-  const playlists = loadPlaylists();
-  if (!playlists[oldName]) return res.status(404).send('Playlist not found');
-  if (playlists[newName]) return res.status(409).send('New name exists');
-  playlists[newName] = playlists[oldName];
-  delete playlists[oldName];
-  savePlaylists(playlists);
-  res.sendStatus(200);
+    const { songId } = req.body; // Changed from 'id' to 'songId'
+    const songPath = path.join(songsDir, songId);
+    
+    if (!fs.existsSync(songPath)) {
+        return res.status(404).json({ error: 'Song not found' });
+    }
+    
+    try {
+        fs.unlinkSync(songPath);
+        
+        // Remove from all playlists
+        const playlists = getPlaylists();
+        Object.keys(playlists).forEach(playlistName => {
+            playlists[playlistName] = playlists[playlistName].filter(id => id !== songId);
+        });
+        
+        savePlaylists(playlists);
+        res.json({ message: 'Song deleted' });
+    } catch (err) {
+        console.error('Delete error:', err);
+        res.status(500).json({ error: 'Failed to delete song' });
+    }
 });
 
-// ... (existing code below)
-const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Premingg Music App server running at http://localhost:${PORT}/`);
+    console.log(`🎵 MuzikApp server running on http://localhost:${PORT}`);
 });
